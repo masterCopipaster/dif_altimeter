@@ -6,22 +6,32 @@
 #include <SD.h>
 #include <RTC.h>
 #include <GyverPower.h>
+#include <stdlib.h>
 
 #define DATA_FILE_NAME F("datalog.csv")
 #define SETTINGS_FILE_NAME F("settings.txt")
-#define DATA_DELIMITER ';'
+char DATA_DELIMITER = ';';
+char DECIMAL_DELIMITER = '.';
+#define DATA_FORMAT_STR "%02d-%02d-%04d%c%02d:%02d:%02d%c%s%c%s%c%s\n"
 
 #define SIGNAL_LED 5
 #define SD_SS 4
 #define DATA_DEST dataFile
 #define LOG_DEST Serial 
+#define ARGN 5
+#define DATA_STR_LEN 100
+#define SARG_LEN 10
+#define CMDSTR_LEN 30
 
 uint32_t period = 5000;
-int arg[5];
-char cmd_str[30];
-int argn;
-char cmd[10];
+int arg[ARGN];
+char sarg[ARGN][SARG_LEN];
+char cmd_str[CMDSTR_LEN];
+int argn = 0;
+int sargn = 0;
+char cmd[SARG_LEN] = {};
 bool power_saving = 0;
+char data_str[DATA_STR_LEN];
 
 Adafruit_BMP280 bmp; // I2C
 DS1307 RTC;
@@ -102,29 +112,8 @@ void handle_data(void)
     }
     File dataFile = SD.open(DATA_FILE_NAME, FILE_WRITE);
   }
-  //print out date
-  DATA_DEST.print(RTC.getDay());
-  DATA_DEST.print("-");
-  DATA_DEST.print(RTC.getMonth());
-  DATA_DEST.print("-");
-  DATA_DEST.print(RTC.getYear());
-  DATA_DEST.print(DATA_DELIMITER);
-  //print out time
-  DATA_DEST.print(RTC.getHours());
-  DATA_DEST.print(":");
-  DATA_DEST.print(RTC.getMinutes());
-  DATA_DEST.print(":");
-  DATA_DEST.print(RTC.getSeconds());
-  DATA_DEST.print(DATA_DELIMITER);
-  //print out temperature
-  DATA_DEST.print(bmp.readTemperature());
-  DATA_DEST.print(DATA_DELIMITER);
-  //print out pressure
-  DATA_DEST.print(bmp.readPressure());
-  DATA_DEST.print(DATA_DELIMITER);
-  //print out approx altitude
-  DATA_DEST.print(bmp.readAltitude(1013.25)); /* Adjusted to local forecast! */
-  DATA_DEST.println();
+  create_data_str(data_str);
+  DATA_DEST.print(data_str);
   dataFile.close();
   digitalWrite(SIGNAL_LED, LOW);
 }
@@ -162,10 +151,8 @@ int read_cmd_file(File f)
 void parse_cmd()
 {
   cmd[0] = 0;
-  argn = sscanf(cmd_str, "%s %d %d %d", cmd, &arg[0], &arg[1], &arg[2]);
-  //Serial.println("got parse");
-  //Serial.println(argn);
-  //Serial.println(arg);
+  argn = sscanf(cmd_str, "%s%d%d%d%d%d", cmd, &arg[0], &arg[1], &arg[2], &arg[3], &arg[4]);
+  sargn = sscanf(cmd_str, "%s%s%s%s%s%s", cmd, &sarg[0], &sarg[1], &sarg[2], &sarg[3], &sarg[4]);
 }
 
 void select_cmd()
@@ -174,36 +161,45 @@ void select_cmd()
   else if(!strcmp(cmd, "sdp")) exec_sdp();
   else if(!strcmp(cmd, "sd")) exec_sd();
   else if(!strcmp(cmd, "sps")) exec_sps();
-  else if(!strcmp(cmd, "ld")) exec_ld();
+  else if(!strcmp(cmd, "sfd")) exec_sfd();
+  else if(!strcmp(cmd, "sdd")) exec_sdd();
+  else if(!strcmp(cmd, "pd")) exec_pd();
   else if(!strcmp(cmd, "ping")) exec_ping();
   else LOG_DEST.println("command not found");
 }
 
-void exec_ld()
+void exec_pd()
 {
-  //print out date
-  LOG_DEST.print(RTC.getDay());
-  LOG_DEST.print("-");
-  LOG_DEST.print(RTC.getMonth());
-  LOG_DEST.print("-");
-  LOG_DEST.print(RTC.getYear());
-  LOG_DEST.print(DATA_DELIMITER);
-  //print out time
-  LOG_DEST.print(RTC.getHours());
-  LOG_DEST.print(":");
-  LOG_DEST.print(RTC.getMinutes());
-  LOG_DEST.print(":");
-  LOG_DEST.print(RTC.getSeconds());
-  LOG_DEST.print(DATA_DELIMITER);
-  //print out temperature
-  LOG_DEST.print(bmp.readTemperature());
-  LOG_DEST.print(DATA_DELIMITER);
-  //print out pressure
-  LOG_DEST.print(bmp.readPressure());
-  LOG_DEST.print(DATA_DELIMITER);
-  //print out approx altitude
-  LOG_DEST.print(bmp.readAltitude(1013.25)); /* Adjusted to local forecast! */
-  LOG_DEST.println();
+  create_data_str(data_str);
+  LOG_DEST.print(data_str);
+}
+
+void char_replace(char* str, char what, char with)
+{
+  for (int i = 0; i < strlen(str); i++)
+  {
+    if(str[i] == what) 
+      str[i] = with;
+  }
+}
+
+void create_data_str(char* str)
+{
+  //"%02d-%02d-%04d%c%02d:%02d:%02d%c%s%c%s%c%s\n"
+  char tempstr[10];
+  char presspstr[10];
+  char altstr[10];
+  dtostrf(bmp.readTemperature(), 3, 2, tempstr);
+  dtostrf(bmp.readPressure(), 6, 2, presspstr);
+  dtostrf(bmp.readAltitude(), 4, 2, altstr);
+  char_replace(tempstr, '.', DECIMAL_DELIMITER);
+  char_replace(presspstr, '.', DECIMAL_DELIMITER);
+  char_replace(altstr, '.', DECIMAL_DELIMITER);
+  sprintf(str, DATA_FORMAT_STR, RTC.getDay(), RTC.getMonth(), RTC.getYear(), DATA_DELIMITER,
+                           RTC.getHours(), RTC.getMinutes(), RTC.getSeconds(), DATA_DELIMITER,
+                           tempstr, DATA_DELIMITER,
+                           presspstr, DATA_DELIMITER,
+                           altstr);
 }
 
 
@@ -211,6 +207,18 @@ void exec_sdp()
 {
   if(argn == 2) 
     period = constrain(arg[0], 1, 36000000);
+}
+
+void exec_sdd()
+{
+  if(sargn == 2) 
+    DECIMAL_DELIMITER = sarg[0][0];
+}
+
+void exec_sfd()
+{
+  if(sargn == 2) 
+    DATA_DELIMITER = sarg[0][0];
 }
 
 void exec_st()
