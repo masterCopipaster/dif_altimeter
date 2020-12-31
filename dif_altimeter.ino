@@ -253,18 +253,21 @@ void exec_ping()
 
 void loop(void)
 {
+  int cycle_time = millis();
   if(read_cmd_serial())
   {
     parse_cmd();
     select_cmd();
   }
   handle_data();
+  cycle_time = millis() - cycle_time;
+  //Serial.println(cycle_time);
   if(power_saving)
   {
-    power.sleepDelay(period);
+    power.sleepDelay(period - cycle_time);
   }
   else
   {
-    delay(period);
+    delay(period - cycle_time);
   }
 }
