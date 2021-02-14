@@ -1,12 +1,14 @@
-#include <TimerOne.h>
-#include <EEPROM.h>
+//STANDARD LIBRARIES
 #include <Wire.h>
 #include <SPI.h>
-#include <Adafruit_BMP280.h>
 #include <SD.h>
-#include <RTC.h>
-#include <GyverPower.h>
 #include <stdlib.h>
+
+//LOCAL LIBRARIES
+#include "RTC.h"
+#include "GyverPower.h"
+#include "Adafruit_BMP280.h"
+
 
 #define DATA_FILE_NAME F("datalog.csv")
 #define SETTINGS_FILE_NAME F("settings.txt")
