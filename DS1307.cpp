@@ -7,7 +7,7 @@
 #include <time.h>
 #include <Arduino.h>
 #include <Wire.h>
-#include <RTC.h>
+#include "RTC.h"
 
 bool DS1307::begin()
 {

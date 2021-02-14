@@ -5,7 +5,7 @@
  */
 
 #include <time.h>
-#include <RTC.h>
+#include "RTC.h"
 
 DateTime::DateTime()
 {
@@ -46,4 +46,3 @@ DateTime::DateTime(uint16_t y, uint8_t mon, uint8_t d, uint8_t hour, uint8_t min
 		week = 0;
 	}
 }
-
