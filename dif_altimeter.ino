@@ -22,8 +22,10 @@ char DECIMAL_DELIMITER = '.';
 #define DATA_STR_LEN 100
 #define SARG_LEN 10
 #define CMDSTR_LEN 30
+#define WAKEUP_PERIOD_MS 300
 
 uint32_t period = 5000;
+bool timing_mode_rtc = 0;
 int arg[ARGN];
 char sarg[ARGN][SARG_LEN];
 char cmd_str[CMDSTR_LEN];
@@ -56,6 +58,12 @@ void setup(void)
     
     RTC.begin();
     RTC.setHourMode(CLOCK_H24);
+    if(!RTC.isRunning())
+    {
+      RTC.setDate(1, 1, 21);
+      RTC.setTime(0, 0, 0);
+      LOG_DEST.println(F("RTC was found off. So was reset to default!"));
+    }
     
     if (!SD.begin(SD_SS)) {
       LOG_DEST.println(F("Card failed, or not present"));
@@ -82,7 +90,7 @@ void setup(void)
     if(power_saving)
     {
       power.setSleepMode(STANDBY_SLEEP);
-      power.autoCalibrate();
+      //power.autoCalibrate();
       //power.hardwareEnable(PWR_UART0);
     }
 
@@ -161,6 +169,7 @@ void select_cmd()
   else if(!strcmp(cmd, "sdp")) exec_sdp();
   else if(!strcmp(cmd, "sd")) exec_sd();
   else if(!strcmp(cmd, "sps")) exec_sps();
+  else if(!strcmp(cmd, "stm")) exec_stm();
   else if(!strcmp(cmd, "sfd")) exec_sfd();
   else if(!strcmp(cmd, "sdd")) exec_sdd();
   else if(!strcmp(cmd, "pd")) exec_pd();
@@ -209,6 +218,12 @@ void exec_sdp()
     period = constrain(arg[0], 1, 36000000);
 }
 
+void exec_stm()
+{
+  if(argn == 2) 
+    timing_mode_rtc = arg[0];
+}
+
 void exec_sdd()
 {
   if(sargn == 2) 
@@ -250,10 +265,39 @@ void exec_ping()
   LOG_DEST.println("pong");
 }
 
+int cycle_time;
 
+#define GET_SECONDS (RTC.getHours() * 3600 + RTC.getMinutes() * 60 + RTC.getSeconds())
+void delay_handler()
+{
+  uint32_t seconds_start = GET_SECONDS;
+  while(1)
+  {
+    //digitalWrite(SIGNAL_LED, HIGH);
+    int delay_time = timing_mode_rtc ? WAKEUP_PERIOD_MS : (period - cycle_time);
+    if(power_saving)
+    {
+      power.sleepDelay(delay_time);
+    }
+    else
+    {
+      delay(delay_time);
+    }
+    if(!timing_mode_rtc) break;
+    else
+    {
+      uint32_t seconds = GET_SECONDS;
+      //Serial.println(seconds);
+      int period_seconds = period / 1000;
+      if(seconds != seconds_start && seconds % period_seconds == 0) break; 
+    }
+    //digitalWrite(SIGNAL_LED, LOW);
+  }
+  //digitalWrite(SIGNAL_LED, LOW);
+}
 void loop(void)
 {
-  int cycle_time = millis();
+  cycle_time = millis();
   if(read_cmd_serial())
   {
     parse_cmd();
@@ -262,12 +306,5 @@ void loop(void)
   handle_data();
   cycle_time = millis() - cycle_time;
   //Serial.println(cycle_time);
-  if(power_saving)
-  {
-    power.sleepDelay(period - cycle_time);
-  }
-  else
-  {
-    delay(period - cycle_time);
-  }
+  delay_handler();
 }
