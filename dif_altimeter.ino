@@ -9,6 +9,13 @@
 #include "GyverPower.h"
 #include "Adafruit_BMP280.h"
 
+//#define DEBUG
+
+#ifdef DEBUG
+  #define DEBUG_LINE(line) line
+#else
+  #define DEBUG_LINE(line) ;
+#endif
 
 #define DATA_FILE_NAME F("datalog.csv")
 #define SETTINGS_FILE_NAME F("settings.txt")
@@ -52,7 +59,7 @@ void setup(void)
       continue;
     }
     
-    bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
+    bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
                     Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
                     Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
                     Adafruit_BMP280::FILTER_X16,      /* Filtering. */
@@ -91,8 +98,8 @@ void setup(void)
     
     if(power_saving)
     {
-      power.setSleepMode(STANDBY_SLEEP);
-      //power.autoCalibrate();
+      power.setSleepMode(POWERDOWN_SLEEP);//STANDBY_SLEEP);
+      power.autoCalibrate();
       //power.hardwareEnable(PWR_UART0);
     }
 
@@ -200,6 +207,7 @@ void create_data_str(char* str)
   char tempstr[10];
   char presspstr[10];
   char altstr[10];
+  bmp.takeForcedMeasurement();
   dtostrf(bmp.readTemperature(), 3, 2, tempstr);
   dtostrf(bmp.readPressure(), 6, 2, presspstr);
   dtostrf(bmp.readAltitude(), 4, 2, altstr);
@@ -275,8 +283,8 @@ void delay_handler()
   uint32_t seconds_start = GET_SECONDS;
   while(1)
   {
-    //digitalWrite(SIGNAL_LED, HIGH);
     int delay_time = timing_mode_rtc ? WAKEUP_PERIOD_MS : (period - cycle_time);
+    DEBUG_LINE(Serial.println(power_saving));
     if(power_saving)
     {
       power.sleepDelay(delay_time);
@@ -285,17 +293,18 @@ void delay_handler()
     {
       delay(delay_time);
     }
+     DEBUG_LINE(digitalWrite(SIGNAL_LED, HIGH));
     if(!timing_mode_rtc) break;
     else
     {
       uint32_t seconds = GET_SECONDS;
-      //Serial.println(seconds);
+      DEBUG_LINE(Serial.println(seconds));
       int period_seconds = period / 1000;
       if(seconds != seconds_start && seconds % period_seconds == 0) break; 
     }
-    //digitalWrite(SIGNAL_LED, LOW);
+    DEBUG_LINE(digitalWrite(SIGNAL_LED, LOW));
   }
-  //digitalWrite(SIGNAL_LED, LOW);
+   DEBUG_LINE(digitalWrite(SIGNAL_LED, LOW));
 }
 void loop(void)
 {

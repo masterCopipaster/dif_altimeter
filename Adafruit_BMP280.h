@@ -200,7 +200,7 @@ public:
   Adafruit_Sensor *getTemperatureSensor(void);
   Adafruit_Sensor *getPressureSensor(void);
 
-  // void takeForcedMeasurement();
+  void takeForcedMeasurement();
   void setSampling(sensor_mode mode = MODE_NORMAL,
                    sensor_sampling tempSampling = SAMPLING_X16,
                    sensor_sampling pressSampling = SAMPLING_X16,
