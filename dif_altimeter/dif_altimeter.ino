@@ -275,7 +275,7 @@ void exec_ping()
   LOG_DEST.println("pong");
 }
 
-int cycle_time;
+int cycle_time = 0;
 
 #define GET_SECONDS (RTC.getHours() * 3600 + RTC.getMinutes() * 60 + RTC.getSeconds())
 void delay_handler()
@@ -306,8 +306,10 @@ void delay_handler()
   }
    DEBUG_LINE(digitalWrite(SIGNAL_LED, LOW));
 }
+
 void loop(void)
 {
+  delay_handler();
   cycle_time = millis();
   if(read_cmd_serial())
   {
@@ -316,6 +318,4 @@ void loop(void)
   }
   handle_data();
   cycle_time = millis() - cycle_time;
-  //Serial.println(cycle_time);
-  delay_handler();
 }
